@@ -5,19 +5,15 @@ import numpy as np
 from datetime import datetime
 from sklearn import preprocessing
 # from sklearn.impute import SimpleImputer
-
-import utils_s
-
-
 # imp = SimpleImputer(missing_values=[np.nan, np.inf, -np.inf], strategy='most_frequent')
 
 def Momentum(close,window_length):
     
-    momentum = close.apply(lambda x:(x - x.shift(window_length))/x).iloc[(window_length-1):,:].fillna(0)
+    momentum = log_Returns(close, window_length)
+    
     momentum_drz = pd.DataFrame(data = preprocessing.scale(momentum),
                                                            index = momentum.index,
                                                            columns = momentum.columns)
-    
     return momentum_drz
 
 def Smooth(factor, window_length):
@@ -27,10 +23,26 @@ def Smooth(factor, window_length):
     return smooth_factor
 
 def Returns(close,window_length):
-    
+
     returns = close.apply(lambda x:(x - x.shift(window_length))/x).iloc[(window_length-1):,:].fillna(0)
+
+    return returns
+
+def log_Returns(close,window_length):
+
+    returns =  (np.log(close / close.shift(window_length)).iloc[(window_length-1):,:]).fillna(0)
     
     return returns
+    
+    
+def volatility(close, window_length, trailing_window):
+    vol = close.pct_change().rolling(window_length).std(ddof=0).rolling(trailing_window).sum()
+    
+    vol_drz = pd.DataFrame(data = preprocessing.scale(vol),
+                                                   index = vol.index,
+                                                   columns = vol.columns) 
+    
+    return vol_drz
 
 def overnight_sentiment(close, openn, window_length, trailing_window):
     
@@ -54,6 +66,7 @@ def direction(close, openn, window_length, trailing_window):
 
     p.replace([np.inf, -np.inf], np.nan, inplace=True)    
     rolling_p = p.rolling(trailing_window).sum()
+    
     direction_scaled = pd.DataFrame(data = preprocessing.scale(rolling_p),
                                                        index = rolling_p.index,
                                                        columns = rolling_p.columns)  
@@ -84,43 +97,18 @@ def sentiment(close, high, low, sent, trailing_window, universe):
                                index = final.index,
                                columns = final.columns).reindex(indexer)
     
-    sent_factor_scaled = sent_factor_scaled[universe]
-    assert len(sent_factor_scaled.columns) == len(close.columns)
+    return sent_factor_scaled[universe]
     
-    return sent_factor_scaled
+def sector_neutral(sectors:dict(), df):
     
-def Fund_QReturn(multi_df,factor):
+    result = []
+    for sec in sectors.keys():
+        result.append(df[sectors[sec]].sub(df[sectors[sec]].mean(axis=1),axis=0))
     
-    factor_unstack = multi_df[factor].unstack('Symbol')
+    df_neutralized = pd.concat(result,axis=1)    
+    df_neutralized_scaled = pd.DataFrame(data = preprocessing.scale(df_neutralized),
+                                                              index = df_neutralized.index,
+                                                              columns = df_neutralized.columns)
     
-    plt.figure(figsize=(20,10))
-    plt.plot(factor_unstack)
-    plt.xticks(rotation=70)
-    plt.grid(True)
-    plt.legend(factor_unstack.columns)
-    plt.show()
-
-    factor_unstack_chge = ((factor_unstack - factor_unstack.shift(1))/factor_unstack.shift(1)).iloc[1:,:]
-    dates= {}
-
-    for tick in factor_unstack_chge.columns:
-        dates[tick] = []
-        for date in factor_unstack_chge.index:
-            if factor_unstack_chge.loc[date,tick]!=0:
-                dates[tick].append(date)
-                
-    for tick in factor_unstack_chge.columns:
-        i=0
-        for date in factor_unstack_chge.index:
-            try:
-                if date == dates[tick][i]:
-                    try:
-                        factor_unstack_chge.loc[slice(date,dates[tick][i+1] - pd.Timedelta(days=1)),tick] = factor_unstack_chge.loc[date,tick]
-                    except:
-                        factor_unstack_chge.loc[date:,tick] = factor_unstack_chge.loc[date,tick]
-                        continue
-                    i=i+1
-            except:
-                pass
+    return df_neutralized_scaled
     
-    return factor_unstack_chge

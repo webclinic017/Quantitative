@@ -18,10 +18,7 @@ from datetime import datetime
 from time import sleep, strftime, localtime,time 
 
 sleeptime = 2
-
-#ORDERS
-#########################################################
-#########################################################   
+ 
 
 def read_nextvalidid(reqId):
 
@@ -230,7 +227,7 @@ def get_openorders():
 
         def __init__(self):
             EClient.__init__(self,self)
-            self.open_orders = pd.DataFrame(columns = ['action','executed_orders',
+            self.open_orders = pd.DataFrame(columns = ['action','open orders',
                                                        'type','algoStrategy',
                                                        'algoParams','status'])
 
@@ -258,10 +255,11 @@ def get_openorders():
 
     app.reqIds(-1)
     app.reqAllOpenOrders()
+    sleep(sleeptime)
+    
     open_orders = app.open_orders
 
     app.run()
-    sleep(sleeptime)
 
     return open_orders
 
@@ -307,6 +305,8 @@ def closing_positions(stock_to_close, portfolio, order_id):
                 order.algoParams.append(TagValue("adaptivePriority", 'Normal'))
 
                 app.placeOrder(orderId = order_id, contract = contract, order = order)
+                sleep(sleeptime)
+                
                 order_id = order_id + 1
                 print ('closing position for {} is: {} '.format(contract.symbol, order.totalQuantity))
 
@@ -319,6 +319,8 @@ def closing_positions(stock_to_close, portfolio, order_id):
                 order.algoParams.append(TagValue("adaptivePriority", 'Normal'))
 
                 app.placeOrder(orderId = order_id, contract = contract, order = order)
+                sleep(sleeptime)
+                
                 order_id = order_id + 1
                 print ('closing position for {} is: {} '.format(contract.symbol, order.totalQuantity))
                 
@@ -340,7 +342,8 @@ def rebalancing_to_leverage(action_balance, order_id):
             if reqId > -1:
                 print("Error. Id: " , reqId, " Code: " , errorCode , " Msg: " , errorString)
 
-
+    app = TestApp()
+    app.connect('127.0.0.1', 7497, 0)
 
     if app.isConnected():
         print ('app is running ...')
@@ -366,6 +369,8 @@ def rebalancing_to_leverage(action_balance, order_id):
                 order.algoParams = []
                 order.algoParams.append(TagValue("adaptivePriority", 'Normal'))
                 app.placeOrder(orderId = order_id, contract = contract, order = order)
+                sleep(sleeptime)
+                
                 order_id = order_id + 1
                 print (' buy order quantity placed for {} is: {} '.format(contract.symbol, order.totalQuantity))
 
@@ -376,6 +381,8 @@ def rebalancing_to_leverage(action_balance, order_id):
                 order.algoParams = []
                 order.algoParams.append(TagValue("adaptivePriority", 'Normal'))
                 app.placeOrder(orderId = order_id, contract = contract, order = order)
+                sleep(sleeptime)
+                
                 order_id = order_id + 1
                 print (' sell order quantity placed for {} is: {} '.format(contract.symbol, order.totalQuantity))
 
@@ -420,6 +427,7 @@ def placing_final_orders(action_final, order_id):
             order.algoParams.append(TagValue("adaptivePriority", 'Normal'))
 
             app.placeOrder(orderId = order_id, contract = contract, order = order)
+            sleep(sleeptime)
             order_id = order_id + 1
             print ('buy order quantity placed for {} is: {} '.format(contract.symbol, order.totalQuantity))
 
@@ -431,6 +439,7 @@ def placing_final_orders(action_final, order_id):
             order.algoParams.append(TagValue("adaptivePriority", 'Normal'))
 
             app.placeOrder(orderId = order_id, contract = contract, order = order)
+            sleep(sleeptime)
             order_id = order_id + 1
             print ('sell order quantity placed for {} is: {} '.format(contract.symbol, order.totalQuantity))
 
@@ -466,7 +475,6 @@ def commission_report(acctCode, time):
                                                             pd.to_datetime(execution.time),
                                                             execution.shares,execution.side,execution.price,
                                                             execution.shares*execution.price]
-
             self.val = self.val + 1
             
         def commissionReport(self, commissionReport):
@@ -481,48 +489,23 @@ def commission_report(acctCode, time):
             super().execDetailsEnd(reqId)
             self.disconnect()
 
-
+    app = TestApp()
+    app.connect('127.0.0.1', 7497, 0)
+    
     execution_filter = ExecutionFilter()
     execution_filter.acctCode = acctCode
     execution_filter.time = time
 
-    app = TestApp()
-    app.connect('127.0.0.1', 7497, 0)
-
     app.reqExecutions(0,execution_filter)
-    df = app.executed_orders
+    sleep(sleeptime)
 
+    df = app.executed_orders
     app.run()
     sleep(sleeptime)
-    
+
     df.set_index('time',inplace=True)
-    df.sort_values(by='time',inplace=True)
+    df.sort_index(inplace=True)
     df['RealizedPNL'][df['RealizedPNL']>1000000] = 'OPEN'
-    
+
     return df
-
-
-def execute_stocks(close,optimal_weights_regularized):
-    
-    df_c = pd.DataFrame(data=close[optimal_weights_regularized.index].iloc[-1].values,
-                   index = close[optimal_weights_regularized.index].iloc[-1].index,
-                   columns = ['close'])
-    df_c.index.name = 'asset'
-
-    optimal_weights_regularized_rounded = np.round(optimal_weights_regularized,2)
-    name = optimal_weights_regularized_rounded.columns[0]
-    
-    optimal_rounded = optimal_weights_regularized_rounded[optimal_weights_regularized_rounded[name] != 0.00]
-
-    return optimal_rounded
-
-
-
-
-
-
-
-
-
-
 
